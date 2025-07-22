@@ -1,39 +1,263 @@
-const runners = Array.from(document.querySelectorAll('.runner'));
-const startButton = document.getElementById('startButton');
-const result = document.getElementById('result');
-const guessSelect = document.getElementById('guess');
+// ゲーム状態
+let gameState = 'betting';
+let selectedHorse = null;
+let raceProgress = [0, 0, 0];
+let winner = null;
+let score = 0;
+let raceCount = 0;
+let speeds = [0, 0, 0];
 
-let intervalId = null;
+// Three.js関連
+let scene, camera, renderer, characters = [];
+let animationId;
 
-function resetRace() {
-  runners.forEach(r => {
-    r.style.left = '0px';
-  });
-  result.textContent = '';
+// ウマ娘データ
+const horses = [
+    { id: 0, name: 'スピードスター', color: 0xff69b4 },
+    { id: 1, name: 'サンダーボルト', color: 0x4169e1 },
+    { id: 2, name: 'ゴールデンウィング', color: 0xffd700 }
+];
+
+const TRACK_LENGTH = 20;
+const FINISH_LINE = 18;
+
+// 初期化
+function init() {
+    const canvas = document.getElementById('gameCanvas');
+    
+    // シーンセットアップ
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+
+    // カメラ
+    camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    camera.position.set(0, 8, 12);
+    camera.lookAt(0, 0, 0);
+
+    // レンダラー
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // ライティング
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(-1, 1, 1);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // トラック作成
+    const trackGeometry = new THREE.PlaneGeometry(4, TRACK_LENGTH);
+    const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+    const track = new THREE.Mesh(trackGeometry, trackMaterial);
+    track.rotation.x = -Math.PI / 2;
+    track.receiveShadow = true;
+    scene.add(track);
+
+    // レーンライン
+    for (let i = -1; i <= 1; i++) {
+        if (i === 0) continue;
+        const lineGeometry = new THREE.BoxGeometry(0.05, 0.01, TRACK_LENGTH);
+        const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const line = new THREE.Mesh(lineGeometry, lineMaterial);
+        line.position.set(i, 0.01, 0);
+        scene.add(line);
+    }
+
+    // スタートライン
+    const startLineGeometry = new THREE.BoxGeometry(4, 0.02, 0.1);
+    const startLineMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const startLine = new THREE.Mesh(startLineGeometry, startLineMaterial);
+    startLine.position.set(0, 0.01, -TRACK_LENGTH/2 + 1);
+    scene.add(startLine);
+
+    // ゴールライン
+    const finishLineGeometry = new THREE.BoxGeometry(4, 0.02, 0.1);
+    const finishLineMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const finishLine = new THREE.Mesh(finishLineGeometry, finishLineMaterial);
+    finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1);
+    scene.add(finishLine);
+
+    // キャラクター作成
+    for (let i = 0; i < 3; i++) {
+        const group = new THREE.Group();
+        
+        // 体
+        const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.castShadow = true;
+        group.add(body);
+
+        // 頭
+        const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+        const headMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 0.8;
+        head.castShadow = true;
+        group.add(head);
+
+        // 手足
+        for (let j = 0; j < 4; j++) {
+            const limbGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+            const limbMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
+            const limb = new THREE.Mesh(limbGeometry, limbMaterial);
+            limb.position.set(
+                j < 2 ? -0.3 : 0.3,
+                -0.4,
+                j % 2 === 0 ? 0.2 : -0.2
+            );
+            limb.castShadow = true;
+            group.add(limb);
+        }
+
+        group.position.set((i - 1) * 1.2, 0.6, -TRACK_LENGTH/2 + 1);
+        characters.push(group);
+        scene.add(group);
+    }
+
+    // イベントリスナー
+    setupEventListeners();
+    
+    // アニメーション開始
+    animate();
+}
+
+function setupEventListeners() {
+    // ウマ娘選択
+    document.querySelectorAll('.horse-card').forEach((card, index) => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedHorse = index;
+        });
+    });
+
+    // ボタンのクリックイベント
+    document.getElementById('startButton').addEventListener('click', startRace);
+    document.getElementById('resetButton').addEventListener('click', resetRace);
+
+    // リサイズ対応
+    window.addEventListener('resize', () => {
+        const canvas = document.getElementById('gameCanvas');
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    });
+}
+
+function animate() {
+    animationId = requestAnimationFrame(animate);
+    
+    // キャラクターアニメーション
+    if (gameState === 'racing') {
+        characters.forEach((character, index) => {
+            const time = Date.now() * 0.005;
+            character.position.y = 0.6 + Math.sin(time * 4 + index) * 0.1;
+            character.rotation.z = Math.sin(time * 8 + index) * 0.1;
+        });
+    }
+
+    // キャラクター位置更新
+    characters.forEach((character, index) => {
+        const startZ = -TRACK_LENGTH/2 + 1;
+        const targetZ = startZ + raceProgress[index];
+        character.position.z = targetZ;
+    });
+
+    renderer.render(scene, camera);
 }
 
 function startRace() {
-  resetRace();
-  startButton.disabled = true;
-  const finish = document.getElementById('raceTrack').clientWidth - 40;
-  const speeds = runners.map(() => Math.random() * 2 + 1);
-  intervalId = setInterval(() => {
-    runners.forEach((runner, i) => {
-      let current = parseFloat(runner.style.left);
-      current += speeds[i];
-      runner.style.left = current + 'px';
-      if (current >= finish) {
-        endRace(i);
-      }
+    if (selectedHorse === null) {
+        alert('予想するウマ娘を選んでください！');
+        return;
+    }
+
+    gameState = 'racing';
+    raceProgress = [0, 0, 0];
+    speeds = [0, 0, 0];
+    winner = null;
+
+    // UI更新
+    document.getElementById('bettingPhase').style.display = 'none';
+    document.getElementById('racingPhase').style.display = 'block';
+    document.getElementById('selectedHorseName').textContent = horses[selectedHorse].name;
+
+    // レース進行
+    const raceInterval = setInterval(() => {
+        speeds = speeds.map(() => Math.random() * 0.3 + 0.1);
+        
+        raceProgress = raceProgress.map((progress, index) => 
+            Math.min(FINISH_LINE, progress + speeds[index])
+        );
+
+        // ゴール判定
+        const finished = raceProgress.findIndex(progress => progress >= FINISH_LINE);
+        if (finished !== -1) {
+            clearInterval(raceInterval);
+            winner = finished;
+            gameState = 'finished';
+            
+            if (finished === selectedHorse) {
+                score += 10;
+            }
+            raceCount++;
+            
+            updateUI();
+            showResult();
+        }
+    }, 100);
+}
+
+function showResult() {
+    document.getElementById('racingPhase').style.display = 'none';
+    document.getElementById('resultPhase').style.display = 'block';
+    document.getElementById('winnerName').textContent = horses[winner].name;
+    
+    const resultMessage = document.getElementById('resultMessage');
+    const resultTitle = resultMessage.querySelector('.result-title');
+    const points = resultMessage.querySelector('.points');
+    
+    if (selectedHorse === winner) {
+        resultMessage.className = 'result-message success';
+        resultTitle.textContent = '🎉 予想的中！ 🎉';
+        points.textContent = '+10ポイント獲得！';
+    } else {
+        resultMessage.className = 'result-message failure';
+        resultTitle.textContent = '😅 予想外れ...';
+        points.textContent = `あなたの予想: ${horses[selectedHorse].name}`;
+    }
+}
+
+function resetRace() {
+    gameState = 'betting';
+    selectedHorse = null;
+    raceProgress = [0, 0, 0];
+    speeds = [0, 0, 0];
+    winner = null;
+    
+    // キャラクターをスタート位置に戻す
+    characters.forEach((character, index) => {
+        character.position.z = -TRACK_LENGTH/2 + 1;
     });
-  }, 16);
+    
+    // UI更新
+    document.getElementById('resultPhase').style.display = 'none';
+    document.getElementById('racingPhase').style.display = 'none';
+    document.getElementById('bettingPhase').style.display = 'block';
+    document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected'));
 }
 
-function endRace(winnerIndex) {
-  clearInterval(intervalId);
-  const guess = parseInt(guessSelect.value, 10);
-  result.textContent = `勝者: キャラ ${winnerIndex + 1}. ${guess === winnerIndex ? '的中!' : 'はずれ'}`;
-  startButton.disabled = false;
+function updateUI() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('raceCount').textContent = raceCount;
 }
 
-startButton.addEventListener('click', startRace);
+// ページ読み込み時に初期化
+window.addEventListener('load', init);
