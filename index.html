@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D ウマ娘レースゲーム</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -391,30 +393,22 @@
             scene.add(finishLine);
 
             // キャラクター作成
-const textureLoader = new THREE.TextureLoader(); // 画像を読み込むための準備
-
-for (let i = 0; i < 3; i++) {
-    // 画像を読み込む
-    const texture = textureLoader.load(`character${i + 1}.png`);
-    
-    // 画像を貼り付けるための「板ポリゴン」を作成
-    const planeGeometry = new THREE.PlaneGeometry(1, 1.5); // キャラクターのサイズ (横1, 縦1.5)
-    const planeMaterial = new THREE.MeshLambertMaterial({
-        map: texture,          // 画像をテクスチャとして設定
-        transparent: true,     // 透明部分を有効にする
-        side: THREE.DoubleSide // 裏からも見えるようにする
-    });
-
-    const characterPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-    characterPlane.castShadow = true; // 影を落とす設定
-
-    // 位置を調整
-    characterPlane.position.set((i - 1) * 1.2, 0.75, -TRACK_LENGTH/2 + 1);
-    
-    characters.push(characterPlane);
-    scene.add(characterPlane);
-}
-// (ここまで)
+            const textureLoader = new THREE.TextureLoader(); // 画像を読み込むための準備
+            for (let i = 0; i < 3; i++) {
+                const texture = textureLoader.load(`character${i + 1}.png`);
+                const planeGeometry = new THREE.PlaneGeometry(1, 1.5);
+                const planeMaterial = new THREE.MeshLambertMaterial({
+                    map: texture,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                const characterPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+                characterPlane.castShadow = true;
+                characterPlane.position.set((i - 1) * 1.2, 0.75, -TRACK_LENGTH/2 + 1);
+                characters.push(characterPlane);
+                scene.add(characterPlane);
+            }
+        }
 
         function setupEventListeners() {
             // ウマ娘選択
@@ -438,16 +432,13 @@ for (let i = 0; i < 3; i++) {
         function animate() {
             animationId = requestAnimationFrame(animate);
             
-            // キャラクターアニメーション
             if (gameState === 'racing') {
                 characters.forEach((character, index) => {
                     const time = Date.now() * 0.005;
-                    character.position.y = 0.6 + Math.sin(time * 4 + index) * 0.1;
-                    character.rotation.z = Math.sin(time * 8 + index) * 0.1;
+                    character.rotation.y = Math.sin(time * 2 + index) * 0.2; // 左右に少し揺れる
                 });
             }
 
-            // キャラクター位置更新
             characters.forEach((character, index) => {
                 const startZ = -TRACK_LENGTH/2 + 1;
                 const targetZ = startZ + raceProgress[index];
@@ -468,12 +459,10 @@ for (let i = 0; i < 3; i++) {
             speeds = [0, 0, 0];
             winner = null;
 
-            // UI更新
             document.getElementById('bettingPhase').style.display = 'none';
             document.getElementById('racingPhase').style.display = 'block';
             document.getElementById('selectedHorseName').textContent = horses[selectedHorse].name;
 
-            // レース進行
             const raceInterval = setInterval(() => {
                 speeds = speeds.map(() => Math.random() * 0.3 + 0.1);
                 
@@ -481,7 +470,6 @@ for (let i = 0; i < 3; i++) {
                     Math.min(FINISH_LINE, progress + speeds[index])
                 );
 
-                // ゴール判定
                 const finished = raceProgress.findIndex(progress => progress >= FINISH_LINE);
                 if (finished !== -1) {
                     clearInterval(raceInterval);
@@ -526,12 +514,10 @@ for (let i = 0; i < 3; i++) {
             speeds = [0, 0, 0];
             winner = null;
             
-            // キャラクターをスタート位置に戻す
             characters.forEach((character, index) => {
                 character.position.z = -TRACK_LENGTH/2 + 1;
             });
             
-            // UI更新
             document.getElementById('resultPhase').style.display = 'none';
             document.getElementById('racingPhase').style.display = 'none';
             document.getElementById('bettingPhase').style.display = 'block';
@@ -543,8 +529,12 @@ for (let i = 0; i < 3; i++) {
             document.getElementById('raceCount').textContent = raceCount;
         }
 
-        // ページ読み込み時に初期化
-        window.addEventListener('load', init);
+        // ページ読み込み時に実行
+        window.addEventListener('load', () => {
+            init();
+            setupEventListeners();
+            animate();
+        });
     </script>
 </body>
 </html>
