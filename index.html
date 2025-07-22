@@ -1,26 +1,75 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>シンプルレースゲーム</title>
-  <link rel="stylesheet" href="race.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D ウマ娘レースゲーム</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-  <h1>走るキャラを当てるゲーム</h1>
-  <p>どのキャラが1位になるか予想してください。</p>
-  <select id="guess">
-    <option value="0">キャラ 1</option>
-    <option value="1">キャラ 2</option>
-    <option value="2">キャラ 3</option>
-  </select>
-  <button id="startButton">レース開始</button>
-  <div id="raceTrack">
-    <div class="runner" id="runner0">🏃‍♀️</div>
-    <div class="runner" id="runner1">🏃‍♀️</div>
-    <div class="runner" id="runner2">🏃‍♀️</div>
-  </div>
-  <p id="result"></p>
-  <script src="race.js"></script>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🏇 3D ウマ娘レースゲーム 🏇</h1>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="score">スコア: <span id="score">0</span>点</span>
+                </div>
+                <div class="stat-item">
+                    <span class="race-count">レース回数: <span id="raceCount">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="viewport">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div id="bettingPhase" class="betting-phase">
+                <h2>どのウマ娘が勝つか予想しよう！</h2>
+                <div class="horse-selection">
+                    <div class="horse-card" data-horse="0">
+                        <div class="horse-emoji">🏃‍♀️</div>
+                        <div class="horse-name">スピードスター</div>
+                        <div class="horse-lane">レーン 1</div>
+                    </div>
+                    <div class="horse-card" data-horse="1">
+                        <div class="horse-emoji">🏃‍♀️</div>
+                        <div class="horse-name">サンダーボルト</div>
+                        <div class="horse-lane">レーン 2</div>
+                    </div>
+                    <div class="horse-card" data-horse="2">
+                        <div class="horse-emoji">🏃‍♀️</div>
+                        <div class="horse-name">ゴールデンウィング</div>
+                        <div class="horse-lane">レーン 3</div>
+                    </div>
+                </div>
+                <button id="startButton" class="start-button">🚀 レース開始！</button>
+            </div>
+
+            <div id="racingPhase" class="racing-phase" style="display: none;">
+                <h2>🏁 レース中... 🏁</h2>
+                <div class="prediction">あなたの予想: <span id="selectedHorseName"></span></div>
+            </div>
+
+            <div id="resultPhase" class="result-phase" style="display: none;">
+                <h2>🏆 レース結果 🏆</h2>
+                <div class="winner-announcement">優勝: <span id="winnerName"></span>！</div>
+                <div class="celebration">🎉</div>
+                
+                <div id="resultMessage" class="result-message">
+                    <div class="result-title"></div>
+                    <div class="points"></div>
+                </div>
+                
+                <button id="resetButton" class="reset-button">🔄 もう一度レース</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
