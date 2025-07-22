@@ -83,43 +83,32 @@ function init() {
     finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1);
     scene.add(finishLine);
 
-    // キャラクター作成
-    for (let i = 0; i < 3; i++) {
-        const group = new THREE.Group();
-        
-        // 体
-        const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8);
-        const bodyMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.castShadow = true;
-        group.add(body);
+    // (ここからが新しいコード)
+// キャラクター作成
+const textureLoader = new THREE.TextureLoader(); // 画像を読み込むための準備
 
-        // 頭
-        const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
-        const headMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 0.8;
-        head.castShadow = true;
-        group.add(head);
+for (let i = 0; i < 3; i++) {
+    // 画像を読み込む
+    const texture = textureLoader.load(`character${i + 1}.png`);
+    
+    // 画像を貼り付けるための「板ポリゴン」を作成
+    const planeGeometry = new THREE.PlaneGeometry(1, 1.5); // キャラクターのサイズ (横1, 縦1.5)
+    const planeMaterial = new THREE.MeshLambertMaterial({
+        map: texture,          // 画像をテクスチャとして設定
+        transparent: true,     // 透明部分を有効にする
+        side: THREE.DoubleSide // 裏からも見えるようにする
+    });
 
-        // 手足
-        for (let j = 0; j < 4; j++) {
-            const limbGeometry = new THREE.SphereGeometry(0.1, 4, 4);
-            const limbMaterial = new THREE.MeshLambertMaterial({ color: horses[i].color });
-            const limb = new THREE.Mesh(limbGeometry, limbMaterial);
-            limb.position.set(
-                j < 2 ? -0.3 : 0.3,
-                -0.4,
-                j % 2 === 0 ? 0.2 : -0.2
-            );
-            limb.castShadow = true;
-            group.add(limb);
-        }
+    const characterPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+    characterPlane.castShadow = true; // 影を落とす設定
 
-        group.position.set((i - 1) * 1.2, 0.6, -TRACK_LENGTH/2 + 1);
-        characters.push(group);
-        scene.add(group);
-    }
+    // 位置を調整
+    characterPlane.position.set((i - 1) * 1.2, 0.75, -TRACK_LENGTH/2 + 1);
+    
+    characters.push(characterPlane);
+    scene.add(characterPlane);
+}
+// (ここまで)
 
     // イベントリスナー
     setupEventListeners();
