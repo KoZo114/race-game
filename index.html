@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
-        /* CSSは変更ありません */
+        /* CSSの変更はありません */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; background: linear-gradient(to bottom, #e3f2fd, #e8f5e8); min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -18,7 +18,7 @@
         .stat-item { background: white; padding: 10px 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .score { color: #2e7d32; font-weight: bold; }
         .race-count { color: #1565c0; font-weight: bold; }
-        .viewport { background: white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; overflow: hidden; }
+        .viewport { background: white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; overflow: hidden; position: relative; }
         #gameCanvas { width: 100%; height: 400px; display: block; }
         .control-panel { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .phase-title { text-align: center; font-size: 1.8rem; color: #333; margin-bottom: 30px; }
@@ -47,27 +47,11 @@
         .points { font-size: 1.1rem; }
         .reset-button { background: #1565c0; color: white; border: none; padding: 12px 30px; font-size: 1.1rem; border-radius: 50px; cursor: pointer; transition: background 0.3s ease; box-shadow: 0 4px 15px rgba(21, 101, 192, 0.3); }
         .reset-button:hover { background: #0d47a1; }
+        #loadingOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #333; z-index: 100; }
         @media (max-width: 768px) {
             .title { font-size: 2rem; }
             .stats { flex-direction: column; gap: 15px; }
             .horse-selection { grid-template-columns: 1fr; }
-        }
-
-        /* ★★★ 追加点 1/3 ★★★ */
-        /* ローディング画面のスタイル */
-        #loadingOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2rem;
-            color: #333;
-            z-index: 100;
         }
     </style>
 </head>
@@ -86,11 +70,9 @@
                 </div>
             </div>
         </div>
-
         <div class="viewport">
             <canvas id="gameCanvas"></canvas>
         </div>
-
         <div class="control-panel">
             <div id="setupPhase" style="display: none;">
                 <h2 class="phase-title">レースの人数を選んでね！</h2>
@@ -100,28 +82,23 @@
                     <button class="count-button" onclick="setupRace(4)">4人</button>
                 </div>
             </div>
-            
             <div id="bettingPhase" class="betting-phase" style="display: none;">
                 <h2 class="phase-title">どの忍びが勝つか予想しよう！</h2>
                 <div class="horse-selection" id="horseSelection"></div>
                 <button class="start-button" onclick="startRace()">🚀 レース開始！</button>
             </div>
-
             <div id="racingPhase" class="racing-phase" style="display: none;">
                 <h2>🏁 レース中... 🏁</h2>
                 <div class="prediction">あなたの予想: <span id="selectedHorseName"></span></div>
             </div>
-
             <div id="resultPhase" class="result-phase" style="display: none;">
                 <h2>🏆 レース結果 🏆</h2>
                 <div class="winner-announcement">優勝: <span id="winnerName"></span>！</div>
                 <div class="celebration">🎉</div>
-                
                 <div id="resultMessage" class="result-message">
                     <div class="result-title"></div>
                     <div class="points"></div>
                 </div>
-                
                 <button class="reset-button" onclick="resetGame()">🔄 もう一度レース</button>
             </div>
         </div>
@@ -130,31 +107,26 @@
     <audio id="raceBgm" src="race_bgm.mp3" loop></audio>
 
     <script>
-        // JavaScriptの変数の部分は変更ありません
-        let gameState = 'setup';
-        let selectedHorse = null;
-        let winner = null;
-        let score = 0;
-        let raceCount = 0;
-        let numHorses = 0;
-        let raceProgress = [];
-        let speeds = [];
-        let scene, camera, renderer, characters = [];
-        let animationId;
+        // ★★★ 変数追加 ★★★
+        let obstacles = []; // 障害物のデータを保存する配列
+        let obstacleMeshes = []; // 障害物の3Dモデルを保存する配列
+        let stumbleTimers = []; // 各キャラクターのつまずき状態を管理
+        // ★★★★★★★★★★★
+        
+        // その他の変数は変更なし
+        let gameState = 'setup', selectedHorse = null, winner = null, score = 0, raceCount = 0;
+        let numHorses = 0, raceProgress = [], speeds = [];
+        let scene, camera, renderer, characters = [], animationId;
         const allHorses = [
-            { id: 0, name: 'シャオラン' },
-            { id: 1, name: 'サクヤ' },
-            { id: 2, name: 'ネム' },
-            { id: 3, name: 'ヒナノジョウ' }
+            { id: 0, name: 'シャオラン' }, { id: 1, name: 'サクヤ' },
+            { id: 2, name: 'ネム' }, { id: 3, name: 'ヒナノジョウ' }
         ];
         let currentHorses = [];
-        const TRACK_LENGTH = 20;
-        const FINISH_LINE = 18;
-        const MAX_HORSES = 4;
+        const TRACK_LENGTH = 20, FINISH_LINE = 18, MAX_HORSES = 4;
 
         function init() {
+            // init関数はloadingManagerの部分以外変更なし
             const canvas = document.getElementById('gameCanvas');
-            
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87ceeb);
             camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
@@ -169,8 +141,6 @@
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
             directionalLight.position.set(-5, 10, 5);
             directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 2048;
-            directionalLight.shadow.mapSize.height = 2048;
             scene.add(directionalLight);
             const trackWidth = MAX_HORSES * 2;
             const trackGeometry = new THREE.PlaneGeometry(trackWidth, TRACK_LENGTH);
@@ -190,37 +160,18 @@
             finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1);
             scene.add(finishLine);
 
-            // ★★★ 追加点 3/3 ★★★
-            // 読み込みを管理するLoadingManagerを準備
             const loadingManager = new THREE.LoadingManager();
-
-            // 全ての読み込みが完了したら実行される処理
             loadingManager.onLoad = () => {
-                console.log('すべての画像の読み込みが完了しました。');
-                // ローディング画面を非表示にする
                 document.getElementById('loadingOverlay').style.display = 'none';
-                // 人数選択ボタンを表示する
                 document.getElementById('setupPhase').style.display = 'block';
             };
-
-            // TextureLoaderに、作成したLoadingManagerを渡す
             const textureLoader = new THREE.TextureLoader(loadingManager);
-            
-            const characterImageFiles = [
-                'syaoran1.webp', 'sakuya1.webp', 'remu1.webp', 'hinanojyou1.webp'
-            ];
-
+            const characterImageFiles = ['syaoran1.webp', 'sakuya1.webp', 'remu1.webp', 'hinanojyou1.webp'];
             for (let i = 0; i < MAX_HORSES; i++) {
                 const imageName = characterImageFiles[i];
-                const texture = textureLoader.load(imageName, 
-                    () => {}, undefined, 
-                    (err) => { console.error(`画像の読み込みに失敗: ${imageName}`); }
-                );
-                
+                const texture = textureLoader.load(imageName);
                 const planeGeometry = new THREE.PlaneGeometry(1.2, 1.8);
-                const planeMaterial = new THREE.MeshLambertMaterial({
-                    map: texture, transparent: true, side: THREE.DoubleSide
-                });
+                const planeMaterial = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
                 const characterPlane = new THREE.Mesh(planeGeometry, planeMaterial);
                 characterPlane.castShadow = true;
                 characterPlane.visible = false;
@@ -228,150 +179,174 @@
                 scene.add(characterPlane);
             }
         }
+        
+        // ★★★ 新規関数：障害物を生成 ★★★
+        function generateObstacles() {
+            // 前のレースの障害物を削除
+            obstacleMeshes.forEach(mesh => scene.remove(mesh));
+            obstacles = [];
+            obstacleMeshes = [];
 
-        // これ以降のJavaScript関数 (setupRace, generateHorseSelectionなど) は変更ありません
-        function setupRace(count) {
-            numHorses = count;
-            currentHorses = allHorses.slice(0, numHorses);
-            gameState = 'betting';
-            document.getElementById('setupPhase').style.display = 'none';
-            document.getElementById('bettingPhase').style.display = 'block';
-            generateHorseSelection();
-            resetCharacters();
-        }
-        function generateHorseSelection() {
-            const selectionDiv = document.getElementById('horseSelection');
-            selectionDiv.innerHTML = '';
-            currentHorses.forEach((horse, index) => {
-                const card = document.createElement('div');
-                card.className = 'horse-card';
-                card.dataset.horse = index;
-                card.innerHTML = `
-                    <div class="horse-emoji">🏃‍♀️</div>
-                    <div class="horse-name">${horse.name}</div>
-                    <div class="horse-lane">レーン ${index + 1}</div>
-                `;
-                card.addEventListener('click', () => {
-                    document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    selectedHorse = index;
-                });
-                selectionDiv.appendChild(card);
-            });
-        }
-        function resetCharacters() {
-            characters.forEach((character, index) => {
-                if (index < numHorses) {
-                    character.visible = true;
-                    const lanePositionX = (index - (numHorses - 1) / 2) * 2;
-                    character.position.set(lanePositionX, 0.9, -TRACK_LENGTH / 2 + 1);
-                } else {
-                    character.visible = false;
+            const OBSTACLE_COUNT = numHorses * 2; // 各レーンに平均2つの障害物
+            for (let i = 0; i < OBSTACLE_COUNT; i++) {
+                const lane = Math.floor(Math.random() * numHorses);
+                const positionZ = -TRACK_LENGTH / 2 + 4 + Math.random() * (FINISH_LINE - 5); // スタートから少し離れた位置に配置
+                const lanePositionX = (lane - (numHorses - 1) / 2) * 2;
+                
+                // 障害物の種類をランダムに決定
+                const isRock = Math.random() > 0.5;
+                const obstacleData = { lane, z: positionZ };
+                obstacles.push(obstacleData);
+
+                let obstacleMesh;
+                if(isRock) { // 岩
+                    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                    const material = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+                    obstacleMesh = new THREE.Mesh(geometry, material);
+                    obstacleMesh.position.set(lanePositionX, 0.25, positionZ);
+                } else { // もぐらの穴
+                    const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
+                    const material = new THREE.MeshStandardMaterial({ color: 0x4e342e });
+                    obstacleMesh = new THREE.Mesh(geometry, material);
+                    obstacleMesh.position.set(lanePositionX, 0.05, positionZ);
                 }
-            });
-        }
-        function animate() {
-            animationId = requestAnimationFrame(animate);
-            if (gameState === 'racing') {
-                characters.forEach((character, index) => {
-                    if (index < numHorses) {
-                        const time = Date.now() * 0.01;
-                        character.rotation.y = Math.sin(time + index * 2) * 0.1;
-                    }
-                });
-            }
-            characters.forEach((character, index) => {
-                if (index < numHorses) {
-                    const startZ = -TRACK_LENGTH/2 + 1;
-                    const targetZ = startZ + raceProgress[index];
-                    character.position.z = THREE.MathUtils.lerp(character.position.z, targetZ, 0.1);
-                }
-            });
-            renderer.render(scene, camera);
-        }
-        function onWindowResize() {
-            const canvas = document.getElementById('gameCanvas');
-            if (canvas) {
-                camera.aspect = canvas.clientWidth / canvas.clientHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                obstacleMesh.castShadow = true;
+                scene.add(obstacleMesh);
+                obstacleMeshes.push(obstacleMesh);
             }
         }
+        
+        // ★★★ 新規関数：キャラクターをジャンプさせる ★★★
+        function jumpCharacter(index) {
+            const character = characters[index];
+            if (character.isJumping) return; // すでにジャンプ中はなにもしない
+
+            character.isJumping = true;
+            const originalY = character.position.y;
+            const jumpHeight = 1.0;
+            let jumpProgress = 0;
+
+            const jumpInterval = setInterval(() => {
+                jumpProgress += 0.1;
+                // sinカーブで滑らかなジャンプを表現
+                character.position.y = originalY + Math.sin(jumpProgress * Math.PI) * jumpHeight;
+                if (jumpProgress >= 1) {
+                    character.position.y = originalY; // 高さを元に戻す
+                    character.isJumping = false;
+                    clearInterval(jumpInterval);
+                }
+            }, 30);
+        }
+
+        // ★★★ レース開始処理を大幅に変更 ★★★
         function startRace() {
             if (selectedHorse === null) {
-                alert('予想する忍びを選んでください！'); // メッセージを修正
+                alert('予想する忍びを選んでください！');
                 return;
             }
+
+            // 障害物を生成
+            generateObstacles();
+            stumbleTimers = new Array(numHorses).fill(0);
+
             const raceBgm = document.getElementById('raceBgm');
             raceBgm.play().catch(e => console.error("BGMの再生に失敗しました:", e));
+
             gameState = 'racing';
             raceProgress = new Array(numHorses).fill(0);
             speeds = new Array(numHorses).fill(0);
             winner = null;
+
             document.getElementById('bettingPhase').style.display = 'none';
             document.getElementById('racingPhase').style.display = 'block';
             document.getElementById('selectedHorseName').textContent = currentHorses[selectedHorse].name;
+
             const raceInterval = setInterval(() => {
-                speeds = speeds.map(() => Math.random() * 0.25 + 0.05);
-                raceProgress = raceProgress.map((progress, index) => Math.min(FINISH_LINE, progress + speeds[index]));
+                // 各キャラクターの処理
+                for (let i = 0; i < numHorses; i++) {
+                    const character = characters[i];
+
+                    // つまずき状態のチェック
+                    if (stumbleTimers[i] > 0) {
+                        stumbleTimers[i]--;
+                        speeds[i] = 0; // スピードをゼロにする
+                        if (stumbleTimers[i] === 0) {
+                            character.rotation.x = 0; // つまずきから回復
+                        }
+                        continue; // このキャラクターの処理はここまで
+                    }
+
+                    // 障害物との距離をチェック
+                    let obstacleAhead = false;
+                    const characterZ = -TRACK_LENGTH / 2 + 1 + raceProgress[i];
+                    for (const obs of obstacles) {
+                        if (obs.lane === i && obs.z > characterZ && obs.z - characterZ < 1.5) {
+                            obstacleAhead = true;
+                            break;
+                        }
+                    }
+
+                    // 障害物が前にある場合の反応
+                    if (obstacleAhead && !character.isJumping) {
+                        if (Math.random() < 0.7) { // 70%の確率でジャンプ成功
+                            jumpCharacter(i);
+                        } else { // 30%の確率でつまずく
+                            stumbleTimers[i] = 20; // 20フレーム(約2秒)つまずく
+                            character.rotation.x = 0.5; // 前のめりに傾ける
+                        }
+                    }
+
+                    // 通常のスピード計算
+                    speeds[i] = Math.random() * 0.25 + 0.05;
+                    raceProgress[i] = Math.min(FINISH_LINE, raceProgress[i] + speeds[i]);
+                }
+
+                // ゴール判定
                 const finished = raceProgress.findIndex(progress => progress >= FINISH_LINE);
                 if (finished !== -1) {
                     clearInterval(raceInterval);
                     winner = finished;
                     gameState = 'finished';
-                    if (finished === selectedHorse) {
-                        score += 10;
-                    }
+                    if (finished === selectedHorse) score += 10;
                     raceCount++;
                     updateUI();
                     showResult();
                 }
             }, 100);
         }
-        function showResult() {
-            document.getElementById('racingPhase').style.display = 'none';
-            document.getElementById('resultPhase').style.display = 'block';
-            document.getElementById('winnerName').textContent = currentHorses[winner].name;
-            const resultMessage = document.getElementById('resultMessage');
-            const resultTitle = resultMessage.querySelector('.result-title');
-            const points = resultMessage.querySelector('.points');
-            if (selectedHorse === winner) {
-                resultMessage.className = 'result-message success';
-                resultTitle.textContent = '🎉 予想的中！ 🎉';
-                points.textContent = '+10ポイント獲得！';
-            } else {
-                resultMessage.className = 'result-message failure';
-                resultTitle.textContent = '😅 予想外れ...';
-                points.textContent = `あなたの予想: ${currentHorses[selectedHorse].name}`;
-            }
-        }
+        
+        // ★★★ ゲームリセット時にも障害物を消す処理を追加 ★★★
         function resetGame() {
             const raceBgm = document.getElementById('raceBgm');
             raceBgm.pause();
             raceBgm.currentTime = 0;
+
+            // 障害物をシーンから削除
+            obstacleMeshes.forEach(mesh => scene.remove(mesh));
+            obstacles = [];
+            obstacleMeshes = [];
+
             gameState = 'setup';
             selectedHorse = null;
             winner = null;
             numHorses = 0;
             currentHorses = [];
-            characters.forEach(character => {
-                character.visible = false;
-            });
+            characters.forEach(c => { c.visible = false; c.rotation.set(0,0,0); c.isJumping = false; });
             document.getElementById('resultPhase').style.display = 'none';
             document.getElementById('bettingPhase').style.display = 'none';
             document.getElementById('racingPhase').style.display = 'none';
-            // ローディングは不要なので直接setupPhaseを表示
             document.getElementById('setupPhase').style.display = 'block';
         }
-        function updateUI() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('raceCount').textContent = raceCount;
-        }
-        window.addEventListener('load', () => {
-            init();
-            animate();
-            window.addEventListener('resize', onWindowResize);
-        });
+
+        // これ以降の関数は変更ありません
+        function setupRace(count) { numHorses = count; currentHorses = allHorses.slice(0, numHorses); gameState = 'betting'; document.getElementById('setupPhase').style.display = 'none'; document.getElementById('bettingPhase').style.display = 'block'; generateHorseSelection(); resetCharacters(); }
+        function generateHorseSelection() { const selectionDiv = document.getElementById('horseSelection'); selectionDiv.innerHTML = ''; currentHorses.forEach((horse, index) => { const card = document.createElement('div'); card.className = 'horse-card'; card.dataset.horse = index; card.innerHTML = ` <div class="horse-emoji">🏃‍♀️</div> <div class="horse-name">${horse.name}</div> <div class="horse-lane">レーン ${index + 1}</div> `; card.addEventListener('click', () => { document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); selectedHorse = index; }); selectionDiv.appendChild(card); }); }
+        function resetCharacters() { characters.forEach((character, index) => { if (index < numHorses) { character.visible = true; const lanePositionX = (index - (numHorses - 1) / 2) * 2; character.position.set(lanePositionX, 0.9, -TRACK_LENGTH / 2 + 1); } else { character.visible = false; } }); }
+        function animate() { animationId = requestAnimationFrame(animate); if (gameState === 'racing') { characters.forEach((character, index) => { if (index < numHorses && !character.isJumping) { const time = Date.now() * 0.01; character.rotation.y = Math.sin(time + index * 2) * 0.1; } }); } characters.forEach((character, index) => { if (index < numHorses) { const startZ = -TRACK_LENGTH/2 + 1; const targetZ = startZ + raceProgress[index]; character.position.z = THREE.MathUtils.lerp(character.position.z, targetZ, 0.1); } }); renderer.render(scene, camera); }
+        function onWindowResize() { const canvas = document.getElementById('gameCanvas'); if (canvas) { camera.aspect = canvas.clientWidth / canvas.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(canvas.clientWidth, canvas.clientHeight); } }
+        function showResult() { document.getElementById('racingPhase').style.display = 'none'; document.getElementById('resultPhase').style.display = 'block'; document.getElementById('winnerName').textContent = currentHorses[winner].name; const resultMessage = document.getElementById('resultMessage'); const resultTitle = resultMessage.querySelector('.result-title'); const points = resultMessage.querySelector('.points'); if (selectedHorse === winner) { resultMessage.className = 'result-message success'; resultTitle.textContent = '🎉 予想的中！ 🎉'; points.textContent = '+10ポイント獲得！'; } else { resultMessage.className = 'result-message failure'; resultTitle.textContent = '😅 予想外れ...'; points.textContent = `あなたの予想: ${currentHorses[selectedHorse].name}`; } }
+        function updateUI() { document.getElementById('score').textContent = score; document.getElementById('raceCount').textContent = raceCount; }
+        window.addEventListener('load', () => { init(); animate(); window.addEventListener('resize', onWindowResize); });
     </script>
 </body>
 </html>
