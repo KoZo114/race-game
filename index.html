@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>着位当てレースゲーム</title>
+    <title>推忍びダービー</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" 
             integrity="sha512-dLxUokApnyCKenD6qIjy+tCvrJacnZlDLlS5A3AHE32WXS8sNn2eN+A5e+92NXJ5h9VqVOc3/z3G0gHNxqGv+w==" 
@@ -273,7 +273,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">🏇 3D ウマ娘レースゲーム 🏇</h1>
+            <h1 class="title"> 推忍びダービー </h1>
             <div class="stats">
                 <div class="stat-item">
                     <span class="score">スコア: <span id="score">0</span>点</span>
@@ -299,7 +299,7 @@
             </div>
             
             <div id="bettingPhase" class="betting-phase" style="display: none;">
-                <h2 class="phase-title">どのウマ娘が勝つか予想しよう！</h2>
+                <h2 class="phase-title">どの忍びが勝つか予想しよう！</h2>
                 <div class="horse-selection" id="horseSelection"></div>
                 <button class="start-button" onclick="startRace()">🚀 レース開始！</button>
             </div>
@@ -342,10 +342,10 @@
         let animationId;
 
         const allHorses = [
-            { id: 0, name: 'スピードスター' },
-            { id: 1, name: 'サンダーボルト' },
-            { id: 2, name: 'ゴールデンウィング' },
-            { id: 3, name: 'ムーンウォーカー' }
+            { id: 0, name: 'シャオラン' },
+            { id: 1, name: 'サクヤ' },
+            { id: 2, name: 'ネム' },
+            { id: 3, name: 'ヒナノジョウ' }
         ];
         let currentHorses = [];
 
