@@ -58,12 +58,55 @@
 <body>
     <div id="loadingOverlay">Now Loading...</div>
     
-    <div class="container"></div>
-
+    <div class="container">
+        <div class="header">
+            <h1 class="title"> 推忍びダービー </h1>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="score">スコア: <span id="score">0</span>点</span>
+                </div>
+                <div class="stat-item">
+                    <span class="race-count">レース回数: <span id="raceCount">0</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="viewport">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div class="control-panel">
+            <div id="setupPhase" style="display: none;">
+                <h2 class="phase-title">レースの人数を選んでね！</h2>
+                <div class="player-count-selection">
+                    <button class="count-button" onclick="setupRace(2)">2人</button>
+                    <button class="count-button" onclick="setupRace(3)">3人</button>
+                    <button class="count-button" onclick="setupRace(4)">4人</button>
+                </div>
+            </div>
+            <div id="bettingPhase" class="betting-phase" style="display: none;">
+                <h2 class="phase-title">どの忍びが勝つか予想しよう！</h2>
+                <div class="horse-selection" id="horseSelection"></div>
+                <button class="start-button" onclick="startRace()">🚀 レース開始！</button>
+            </div>
+            <div id="racingPhase" class="racing-phase" style="display: none;">
+                <h2>🏁 レース中... 🏁</h2>
+                <div class="prediction">あなたの予想: <span id="selectedHorseName"></span></div>
+            </div>
+            <div id="resultPhase" class="result-phase" style="display: none;">
+                <h2>🏆 レース結果 🏆</h2>
+                <div class="winner-announcement">優勝: <span id="winnerName"></span>！</div>
+                <div class="celebration">🎉</div>
+                <div id="resultMessage" class="result-message">
+                    <div class="result-title"></div>
+                    <div class="points"></div>
+                </div>
+                <button class="reset-button" onclick="resetGame()">🔄 もう一度レース</button>
+            </div>
+        </div>
+    </div>
     <audio id="raceBgm" src="race_bgm.mp3" loop></audio>
 
     <script>
-        // 変数・定数は変更なし
+        // 変数定義
         let obstacles = [], obstacleMeshes = [], stumbleTimers = [];
         let gameState = 'setup', selectedHorse = null, winner = null, score = 0, raceCount = 0;
         let numHorses = 0, raceProgress = [], speeds = [];
@@ -75,7 +118,7 @@
         let currentHorses = [];
         const TRACK_LENGTH = 20, FINISH_LINE = 18, MAX_HORSES = 4;
 
-        // init関数は変更なし
+        // init関数
         function init() {
             const canvas = document.getElementById('gameCanvas');
             scene = new THREE.Scene();
@@ -119,28 +162,22 @@
             }
         }
         
-        // ★★★ 変更点：障害物を「１つだけ」生成する関数に変更 ★★★
+        // 障害物を１つだけ生成する関数
         function createSingleObstacle(lane, positionZ) {
             const lanePositionX = (lane - (numHorses - 1) / 2) * 2;
-            
-            // 他の障害物と位置が近すぎる場合は生成しない
             for(const obs of obstacles) {
-                if (Math.abs(obs.z - positionZ) < 2.0) {
-                    return; // 位置が近すぎるので中止
-                }
+                if (Math.abs(obs.z - positionZ) < 2.0) { return; }
             }
-
             const isRock = Math.random() > 0.5;
             const obstacleData = { lane, z: positionZ };
             obstacles.push(obstacleData);
-
             let obstacleMesh;
-            if(isRock) { // 岩
+            if(isRock) {
                 const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
                 const material = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
                 obstacleMesh = new THREE.Mesh(geometry, material);
                 obstacleMesh.position.set(lanePositionX, 0.25, positionZ);
-            } else { // もぐらの穴
+            } else {
                 const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
                 const material = new THREE.MeshStandardMaterial({ color: 0x4e342e });
                 obstacleMesh = new THREE.Mesh(geometry, material);
@@ -151,19 +188,16 @@
             obstacleMeshes.push(obstacleMesh);
         }
         
-        // jumpCharacter関数は変更なし
+        // ジャンプ関数
         function jumpCharacter(index) { const character = characters[index]; if (character.isJumping) return; character.isJumping = true; const originalY = character.position.y; const jumpHeight = 1.0; let jumpProgress = 0; const jumpInterval = setInterval(() => { jumpProgress += 0.1; character.position.y = originalY + Math.sin(jumpProgress * Math.PI) * jumpHeight; if (jumpProgress >= 1) { character.position.y = originalY; character.isJumping = false; clearInterval(jumpInterval); } }, 30); }
 
-        // ★★★ レース開始処理を大幅に変更 ★★★
+        // レース開始処理
         function startRace() {
             if (selectedHorse === null) { alert('予想する忍びを選んでください！'); return; }
 
-            // ★★★ 変更点：レース開始時の障害物生成を削除 ★★★
-            // generateObstacles(); // この行を削除
-
             stumbleTimers = new Array(numHorses).fill(0);
-            let spawnedObstacleCount = 0; // このレースで生成した障害物の数をカウント
-            const MAX_OBSTACLES_PER_RACE = 2; // レース中に生成する障害物の最大数
+            let spawnedObstacleCount = 0;
+            const MAX_OBSTACLES_PER_RACE = 2;
 
             const raceBgm = document.getElementById('raceBgm');
             raceBgm.play().catch(e => console.error("BGMの再生に失敗しました:", e));
@@ -179,28 +213,19 @@
 
             const raceInterval = setInterval(() => {
                 
-                // ★★★ 追加点：レース中に障害物を動的に生成する処理 ★★★
                 if (spawnedObstacleCount < MAX_OBSTACLES_PER_RACE && Math.random() < 0.015) {
-                    // 1.5%の確率で障害物を生成
                     let leaderIndex = 0;
                     let maxProgress = 0;
-                    // 現在のトップ走者を調べる
                     raceProgress.forEach((prog, index) => {
-                        if (prog > maxProgress) {
-                            maxProgress = prog;
-                            leaderIndex = index;
-                        }
+                        if (prog > maxProgress) { maxProgress = prog; leaderIndex = index; }
                     });
-
-                    // トップ走者の少し前に障害物を置く
-                    const spawnZ = -TRACK_LENGTH / 2 + 1 + maxProgress + 3.0; // 3ユニット前
-                    if (spawnZ < FINISH_LINE - 2) { // ゴール直前には置かない
+                    const spawnZ = -TRACK_LENGTH / 2 + 1 + maxProgress + 3.0;
+                    if (spawnZ < FINISH_LINE - 2) {
                         createSingleObstacle(leaderIndex, spawnZ);
                         spawnedObstacleCount++;
                     }
                 }
 
-                // 各キャラクターの処理（ここは変更なし）
                 for (let i = 0; i < numHorses; i++) {
                     const character = characters[i];
                     if (stumbleTimers[i] > 0) {
@@ -218,26 +243,21 @@
                             break;
                         }
                     }
-
+                    
+                    // ★★★ ここがジャンプとつまずきのロジックです ★★★
                     if (obstacleAhead && !character.isJumping) {
-// ジャンプを試みる確率 (調整可能)
-if (Math.random() < 0.6) {
-jumpCharacter(i);
-} else {
-// ジャンプに失敗した場合（またはジャンプを試みなかった場合）、つまずく確率
-if (Math.random() < 0.7) {
-stumbleTimers[i] = 20;
-character.rotation.x = 0.5;
-}
-// つまずきも回避する可能性 (低確率)
-}
-}
+                        if (Math.random() < 0.7) { // 70%の確率でジャンプ成功
+                            jumpCharacter(i);
+                        } else { // 30%の確率でつまずく
+                            stumbleTimers[i] = 20; 
+                            character.rotation.x = 0.5;
+                        }
+                    }
 
                     speeds[i] = Math.random() * 0.18 + 0.04;
                     raceProgress[i] = Math.min(FINISH_LINE, raceProgress[i] + speeds[i]);
                 }
 
-                // ゴール判定（ここは変更なし）
                 const finished = raceProgress.findIndex(progress => progress >= FINISH_LINE);
                 if (finished !== -1) {
                     clearInterval(raceInterval);
