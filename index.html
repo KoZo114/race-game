@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
-        /* CSSの変更はありません */
+        /* CSSは変更ありません */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; background: linear-gradient(to bottom, #e3f2fd, #e8f5e8); min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -58,62 +58,13 @@
 <body>
     <div id="loadingOverlay">Now Loading...</div>
     
-    <div class="container">
-        <div class="header">
-            <h1 class="title"> 推忍びダービー </h1>
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="score">スコア: <span id="score">0</span>点</span>
-                </div>
-                <div class="stat-item">
-                    <span class="race-count">レース回数: <span id="raceCount">0</span></span>
-                </div>
-            </div>
-        </div>
-        <div class="viewport">
-            <canvas id="gameCanvas"></canvas>
-        </div>
-        <div class="control-panel">
-            <div id="setupPhase" style="display: none;">
-                <h2 class="phase-title">レースの人数を選んでね！</h2>
-                <div class="player-count-selection">
-                    <button class="count-button" onclick="setupRace(2)">2人</button>
-                    <button class="count-button" onclick="setupRace(3)">3人</button>
-                    <button class="count-button" onclick="setupRace(4)">4人</button>
-                </div>
-            </div>
-            <div id="bettingPhase" class="betting-phase" style="display: none;">
-                <h2 class="phase-title">どの忍びが勝つか予想しよう！</h2>
-                <div class="horse-selection" id="horseSelection"></div>
-                <button class="start-button" onclick="startRace()">🚀 レース開始！</button>
-            </div>
-            <div id="racingPhase" class="racing-phase" style="display: none;">
-                <h2>🏁 レース中... 🏁</h2>
-                <div class="prediction">あなたの予想: <span id="selectedHorseName"></span></div>
-            </div>
-            <div id="resultPhase" class="result-phase" style="display: none;">
-                <h2>🏆 レース結果 🏆</h2>
-                <div class="winner-announcement">優勝: <span id="winnerName"></span>！</div>
-                <div class="celebration">🎉</div>
-                <div id="resultMessage" class="result-message">
-                    <div class="result-title"></div>
-                    <div class="points"></div>
-                </div>
-                <button class="reset-button" onclick="resetGame()">🔄 もう一度レース</button>
-            </div>
-        </div>
-    </div>
+    <div class="container"></div>
 
     <audio id="raceBgm" src="race_bgm.mp3" loop></audio>
 
     <script>
-        // ★★★ 変数追加 ★★★
-        let obstacles = []; // 障害物のデータを保存する配列
-        let obstacleMeshes = []; // 障害物の3Dモデルを保存する配列
-        let stumbleTimers = []; // 各キャラクターのつまずき状態を管理
-        // ★★★★★★★★★★★
-        
-        // その他の変数は変更なし
+        // 変数・定数は変更なし
+        let obstacles = [], obstacleMeshes = [], stumbleTimers = [];
         let gameState = 'setup', selectedHorse = null, winner = null, score = 0, raceCount = 0;
         let numHorses = 0, raceProgress = [], speeds = [];
         let scene, camera, renderer, characters = [], animationId;
@@ -124,41 +75,32 @@
         let currentHorses = [];
         const TRACK_LENGTH = 20, FINISH_LINE = 18, MAX_HORSES = 4;
 
+        // init関数は変更なし
         function init() {
-            // init関数はloadingManagerの部分以外変更なし
             const canvas = document.getElementById('gameCanvas');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87ceeb);
             camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-            camera.position.set(0, 5, 12);
-            camera.lookAt(0, 0, 0);
+            camera.position.set(0, 5, 12); camera.lookAt(0, 0, 0);
             renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(-5, 10, 5);
-            directionalLight.castShadow = true;
-            scene.add(directionalLight);
+            directionalLight.position.set(-5, 10, 5); directionalLight.castShadow = true; scene.add(directionalLight);
             const trackWidth = MAX_HORSES * 2;
             const trackGeometry = new THREE.PlaneGeometry(trackWidth, TRACK_LENGTH);
             const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x6B8E23 });
             const track = new THREE.Mesh(trackGeometry, trackMaterial);
-            track.rotation.x = -Math.PI / 2;
-            track.receiveShadow = true;
-            scene.add(track);
+            track.rotation.x = -Math.PI / 2; track.receiveShadow = true; scene.add(track);
             const startLineGeometry = new THREE.BoxGeometry(trackWidth, 0.02, 0.1);
             const startLineMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
             const startLine = new THREE.Mesh(startLineGeometry, startLineMaterial);
-            startLine.position.set(0, 0.01, -TRACK_LENGTH/2 + 1);
-            scene.add(startLine);
+            startLine.position.set(0, 0.01, -TRACK_LENGTH/2 + 1); scene.add(startLine);
             const finishLineGeometry = new THREE.BoxGeometry(trackWidth, 0.02, 0.1);
             const finishLineMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             const finishLine = new THREE.Mesh(finishLineGeometry, finishLineMaterial);
-            finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1);
-            scene.add(finishLine);
+            finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1); scene.add(finishLine);
 
             const loadingManager = new THREE.LoadingManager();
             loadingManager.onLoad = () => {
@@ -168,86 +110,60 @@
             const textureLoader = new THREE.TextureLoader(loadingManager);
             const characterImageFiles = ['syaoran1.webp', 'sakuya1.webp', 'remu1.webp', 'hinanojyou1.webp'];
             for (let i = 0; i < MAX_HORSES; i++) {
-                const imageName = characterImageFiles[i];
-                const texture = textureLoader.load(imageName);
+                const texture = textureLoader.load(characterImageFiles[i]);
                 const planeGeometry = new THREE.PlaneGeometry(1.2, 1.8);
                 const planeMaterial = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
                 const characterPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-                characterPlane.castShadow = true;
-                characterPlane.visible = false;
-                characters.push(characterPlane);
-                scene.add(characterPlane);
+                characterPlane.castShadow = true; characterPlane.visible = false;
+                characters.push(characterPlane); scene.add(characterPlane);
             }
         }
         
-        // ★★★ 新規関数：障害物を生成 ★★★
-        function generateObstacles() {
-            // 前のレースの障害物を削除
-            obstacleMeshes.forEach(mesh => scene.remove(mesh));
-            obstacles = [];
-            obstacleMeshes = [];
-
-            const OBSTACLE_COUNT = numHorses * 2; // 各レーンに平均2つの障害物
-            for (let i = 0; i < OBSTACLE_COUNT; i++) {
-                const lane = Math.floor(Math.random() * numHorses);
-                const positionZ = -TRACK_LENGTH / 2 + 4 + Math.random() * (FINISH_LINE - 5); // スタートから少し離れた位置に配置
-                const lanePositionX = (lane - (numHorses - 1) / 2) * 2;
-                
-                // 障害物の種類をランダムに決定
-                const isRock = Math.random() > 0.5;
-                const obstacleData = { lane, z: positionZ };
-                obstacles.push(obstacleData);
-
-                let obstacleMesh;
-                if(isRock) { // 岩
-                    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-                    const material = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
-                    obstacleMesh = new THREE.Mesh(geometry, material);
-                    obstacleMesh.position.set(lanePositionX, 0.25, positionZ);
-                } else { // もぐらの穴
-                    const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
-                    const material = new THREE.MeshStandardMaterial({ color: 0x4e342e });
-                    obstacleMesh = new THREE.Mesh(geometry, material);
-                    obstacleMesh.position.set(lanePositionX, 0.05, positionZ);
+        // ★★★ 変更点：障害物を「１つだけ」生成する関数に変更 ★★★
+        function createSingleObstacle(lane, positionZ) {
+            const lanePositionX = (lane - (numHorses - 1) / 2) * 2;
+            
+            // 他の障害物と位置が近すぎる場合は生成しない
+            for(const obs of obstacles) {
+                if (Math.abs(obs.z - positionZ) < 2.0) {
+                    return; // 位置が近すぎるので中止
                 }
-                obstacleMesh.castShadow = true;
-                scene.add(obstacleMesh);
-                obstacleMeshes.push(obstacleMesh);
             }
+
+            const isRock = Math.random() > 0.5;
+            const obstacleData = { lane, z: positionZ };
+            obstacles.push(obstacleData);
+
+            let obstacleMesh;
+            if(isRock) { // 岩
+                const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const material = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+                obstacleMesh = new THREE.Mesh(geometry, material);
+                obstacleMesh.position.set(lanePositionX, 0.25, positionZ);
+            } else { // もぐらの穴
+                const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
+                const material = new THREE.MeshStandardMaterial({ color: 0x4e342e });
+                obstacleMesh = new THREE.Mesh(geometry, material);
+                obstacleMesh.position.set(lanePositionX, 0.05, positionZ);
+            }
+            obstacleMesh.castShadow = true;
+            scene.add(obstacleMesh);
+            obstacleMeshes.push(obstacleMesh);
         }
         
-        // ★★★ 新規関数：キャラクターをジャンプさせる ★★★
-        function jumpCharacter(index) {
-            const character = characters[index];
-            if (character.isJumping) return; // すでにジャンプ中はなにもしない
-
-            character.isJumping = true;
-            const originalY = character.position.y;
-            const jumpHeight = 1.0;
-            let jumpProgress = 0;
-
-            const jumpInterval = setInterval(() => {
-                jumpProgress += 0.1;
-                // sinカーブで滑らかなジャンプを表現
-                character.position.y = originalY + Math.sin(jumpProgress * Math.PI) * jumpHeight;
-                if (jumpProgress >= 1) {
-                    character.position.y = originalY; // 高さを元に戻す
-                    character.isJumping = false;
-                    clearInterval(jumpInterval);
-                }
-            }, 30);
-        }
+        // jumpCharacter関数は変更なし
+        function jumpCharacter(index) { const character = characters[index]; if (character.isJumping) return; character.isJumping = true; const originalY = character.position.y; const jumpHeight = 1.0; let jumpProgress = 0; const jumpInterval = setInterval(() => { jumpProgress += 0.1; character.position.y = originalY + Math.sin(jumpProgress * Math.PI) * jumpHeight; if (jumpProgress >= 1) { character.position.y = originalY; character.isJumping = false; clearInterval(jumpInterval); } }, 30); }
 
         // ★★★ レース開始処理を大幅に変更 ★★★
         function startRace() {
-            if (selectedHorse === null) {
-                alert('予想する忍びを選んでください！');
-                return;
-            }
+            if (selectedHorse === null) { alert('予想する忍びを選んでください！'); return; }
 
-            // 障害物を生成
-            generateObstacles();
+            // ★★★ 変更点：レース開始時の障害物生成を削除 ★★★
+            // generateObstacles(); // この行を削除
+
             stumbleTimers = new Array(numHorses).fill(0);
+            let spawnedObstacleCount = 0; // このレースで生成した障害物の数をカウント
+            const MAX_OBSTACLES_PER_RACE = 2; // レース中に生成する障害物の最大数
 
             const raceBgm = document.getElementById('raceBgm');
             raceBgm.play().catch(e => console.error("BGMの再生に失敗しました:", e));
@@ -262,21 +178,38 @@
             document.getElementById('selectedHorseName').textContent = currentHorses[selectedHorse].name;
 
             const raceInterval = setInterval(() => {
-                // 各キャラクターの処理
+                
+                // ★★★ 追加点：レース中に障害物を動的に生成する処理 ★★★
+                if (spawnedObstacleCount < MAX_OBSTACLES_PER_RACE && Math.random() < 0.015) {
+                    // 1.5%の確率で障害物を生成
+                    let leaderIndex = 0;
+                    let maxProgress = 0;
+                    // 現在のトップ走者を調べる
+                    raceProgress.forEach((prog, index) => {
+                        if (prog > maxProgress) {
+                            maxProgress = prog;
+                            leaderIndex = index;
+                        }
+                    });
+
+                    // トップ走者の少し前に障害物を置く
+                    const spawnZ = -TRACK_LENGTH / 2 + 1 + maxProgress + 3.0; // 3ユニット前
+                    if (spawnZ < FINISH_LINE - 2) { // ゴール直前には置かない
+                        createSingleObstacle(leaderIndex, spawnZ);
+                        spawnedObstacleCount++;
+                    }
+                }
+
+                // 各キャラクターの処理（ここは変更なし）
                 for (let i = 0; i < numHorses; i++) {
                     const character = characters[i];
-
-                    // つまずき状態のチェック
                     if (stumbleTimers[i] > 0) {
                         stumbleTimers[i]--;
-                        speeds[i] = 0; // スピードをゼロにする
-                        if (stumbleTimers[i] === 0) {
-                            character.rotation.x = 0; // つまずきから回復
-                        }
-                        continue; // このキャラクターの処理はここまで
+                        speeds[i] = 0;
+                        if (stumbleTimers[i] === 0) character.rotation.x = 0;
+                        continue;
                     }
 
-                    // 障害物との距離をチェック
                     let obstacleAhead = false;
                     const characterZ = -TRACK_LENGTH / 2 + 1 + raceProgress[i];
                     for (const obs of obstacles) {
@@ -286,22 +219,25 @@
                         }
                     }
 
-                    // 障害物が前にある場合の反応
                     if (obstacleAhead && !character.isJumping) {
-                        if (Math.random() < 0.7) { // 70%の確率でジャンプ成功
-                            jumpCharacter(i);
-                        } else { // 30%の確率でつまずく
-                            stumbleTimers[i] = 20; // 20フレーム(約2秒)つまずく
-                            character.rotation.x = 0.5; // 前のめりに傾ける
-                        }
-                    }
+// ジャンプを試みる確率 (調整可能)
+if (Math.random() < 0.6) {
+jumpCharacter(i);
+} else {
+// ジャンプに失敗した場合（またはジャンプを試みなかった場合）、つまずく確率
+if (Math.random() < 0.7) {
+stumbleTimers[i] = 20;
+character.rotation.x = 0.5;
+}
+// つまずきも回避する可能性 (低確率)
+}
+}
 
-                    // 通常のスピード計算
                     speeds[i] = Math.random() * 0.18 + 0.04;
                     raceProgress[i] = Math.min(FINISH_LINE, raceProgress[i] + speeds[i]);
                 }
 
-                // ゴール判定
+                // ゴール判定（ここは変更なし）
                 const finished = raceProgress.findIndex(progress => progress >= FINISH_LINE);
                 if (finished !== -1) {
                     clearInterval(raceInterval);
@@ -315,30 +251,8 @@
             }, 100);
         }
         
-        // ★★★ ゲームリセット時にも障害物を消す処理を追加 ★★★
-        function resetGame() {
-            const raceBgm = document.getElementById('raceBgm');
-            raceBgm.pause();
-            raceBgm.currentTime = 0;
-
-            // 障害物をシーンから削除
-            obstacleMeshes.forEach(mesh => scene.remove(mesh));
-            obstacles = [];
-            obstacleMeshes = [];
-
-            gameState = 'setup';
-            selectedHorse = null;
-            winner = null;
-            numHorses = 0;
-            currentHorses = [];
-            characters.forEach(c => { c.visible = false; c.rotation.set(0,0,0); c.isJumping = false; });
-            document.getElementById('resultPhase').style.display = 'none';
-            document.getElementById('bettingPhase').style.display = 'none';
-            document.getElementById('racingPhase').style.display = 'none';
-            document.getElementById('setupPhase').style.display = 'block';
-        }
-
         // これ以降の関数は変更ありません
+        function resetGame() { const raceBgm = document.getElementById('raceBgm'); raceBgm.pause(); raceBgm.currentTime = 0; obstacleMeshes.forEach(mesh => scene.remove(mesh)); obstacles = []; obstacleMeshes = []; gameState = 'setup'; selectedHorse = null; winner = null; numHorses = 0; currentHorses = []; characters.forEach(c => { c.visible = false; c.rotation.set(0,0,0); c.isJumping = false; }); document.getElementById('resultPhase').style.display = 'none'; document.getElementById('bettingPhase').style.display = 'none'; document.getElementById('racingPhase').style.display = 'none'; document.getElementById('setupPhase').style.display = 'block'; }
         function setupRace(count) { numHorses = count; currentHorses = allHorses.slice(0, numHorses); gameState = 'betting'; document.getElementById('setupPhase').style.display = 'none'; document.getElementById('bettingPhase').style.display = 'block'; generateHorseSelection(); resetCharacters(); }
         function generateHorseSelection() { const selectionDiv = document.getElementById('horseSelection'); selectionDiv.innerHTML = ''; currentHorses.forEach((horse, index) => { const card = document.createElement('div'); card.className = 'horse-card'; card.dataset.horse = index; card.innerHTML = ` <div class="horse-emoji">🏃‍♀️</div> <div class="horse-name">${horse.name}</div> <div class="horse-lane">レーン ${index + 1}</div> `; card.addEventListener('click', () => { document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); selectedHorse = index; }); selectionDiv.appendChild(card); }); }
         function resetCharacters() { characters.forEach((character, index) => { if (index < numHorses) { character.visible = true; const lanePositionX = (index - (numHorses - 1) / 2) * 2; character.position.set(lanePositionX, 0.9, -TRACK_LENGTH / 2 + 1); } else { character.visible = false; } }); }
