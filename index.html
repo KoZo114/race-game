@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>着位当てレースゲーム</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" 
+            integrity="sha512-dLxUokApnyCKenD6qIjy+tCvrJacnZlDLlS5A3AHE32WXS8sNn2eN+A5e+92NXJ5h9VqVOc3/z3G0gHNxqGv+w==" 
+            crossorigin="anonymous"></script>
     
     <style>
         /* CSSは変更ありません */
@@ -351,7 +353,6 @@
         const FINISH_LINE = 18;
         const MAX_HORSES = 4;
 
-        // init(), setupRace(), generateHorseSelection(), resetCharacters(), animate(), onWindowResize() 関数は変更ありません
         function init() {
             const canvas = document.getElementById('gameCanvas');
             
@@ -398,11 +399,27 @@
             scene.add(finishLine);
 
             const textureLoader = new THREE.TextureLoader();
+            
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            // ここが変更点です！
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            
+            // 使用する画像ファイル名をリスト（配列）にまとめます
+            const characterImageFiles = [
+                'syaoran1.webp',
+                'sakuya1.webp',
+                'remu1.webp',
+                'hinanojyou1.webp'
+            ];
+
             for (let i = 0; i < MAX_HORSES; i++) {
-                const texture = textureLoader.load(`character${i + 1}.png`, 
+                const imageName = characterImageFiles[i]; // リストからファイル名を取得
+                const texture = textureLoader.load(imageName, 
                     () => {}, undefined, 
-                    (err) => { console.error(`画像の読み込みに失敗: character${i + 1}.png`); }
+                    (err) => { console.error(`画像の読み込みに失敗: ${imageName}`); }
                 );
+                // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+                
                 const planeGeometry = new THREE.PlaneGeometry(1.2, 1.8);
                 const planeMaterial = new THREE.MeshLambertMaterial({
                     map: texture, transparent: true, side: THREE.DoubleSide
@@ -499,10 +516,8 @@
                 return;
             }
             
-            // ★★★ 追加点 (2/2) その1 ★★★
-            // id 'raceBgm' を持つaudio要素を取得して再生する
             const raceBgm = document.getElementById('raceBgm');
-            raceBgm.play().catch(e => console.error("BGMの再生に失敗しました:", e)); // エラー処理を追加
+            raceBgm.play().catch(e => console.error("BGMの再生に失敗しました:", e));
 
             gameState = 'racing';
             raceProgress = new Array(numHorses).fill(0);
@@ -538,7 +553,6 @@
         }
 
         function showResult() {
-            // showResult()関数は変更ありません
             document.getElementById('racingPhase').style.display = 'none';
             document.getElementById('resultPhase').style.display = 'block';
             document.getElementById('winnerName').textContent = currentHorses[winner].name;
@@ -559,8 +573,6 @@
         }
 
         function resetGame() {
-            // ★★★ 追加点 (2/2) その2 ★★★
-            // BGMを停止し、再生位置を最初に戻す
             const raceBgm = document.getElementById('raceBgm');
             raceBgm.pause();
             raceBgm.currentTime = 0;
@@ -581,7 +593,6 @@
             document.getElementById('setupPhase').style.display = 'block';
         }
 
-        // updateUI()関数は変更ありません
         function updateUI() {
             document.getElementById('score').textContent = score;
             document.getElementById('raceCount').textContent = raceCount;
