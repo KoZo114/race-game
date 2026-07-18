@@ -114,7 +114,7 @@
         let numHorses = 0, raceProgress = [], speeds = [];
         let scene, camera, renderer, characters = [], characterMixers = [], animationId;
         const allHorses = [
-            { id: 0, name: 'オト', emoji: '🦊', is3D: true }, { id: 1, name: 'サクヤ', emoji: '🏃‍♀️' },
+            { id: 0, name: 'オト', emoji: '🦊', is3D: true }, { id: 1, name: 'シャオラン', emoji: '☀️', is3D: true },
             { id: 2, name: 'ネム', emoji: '🏃‍♀️' }, { id: 3, name: 'ヒナノジョウ', emoji: '🏃‍♀️' }
         ];
         let currentHorses = [];
@@ -122,6 +122,7 @@
         const clock = new THREE.Clock();
         const characterImageFiles = ['syaoran1.webp', 'sakuya1.webp', 'remu1.webp', 'hinanojyou1.webp'];
         const OTO_MODEL_FILE = 'assets/oto-running.glb';
+        const SYAORAN_MODEL_FILE = 'assets/syaoran-running.glb';
 
         function init() {
             const canvas = document.getElementById('gameCanvas');
@@ -215,30 +216,10 @@
             const textureLoader = new THREE.TextureLoader(loadingManager);
             const gltfLoader = new THREE.GLTFLoader(loadingManager);
 
-            gltfLoader.load(OTO_MODEL_FILE, (gltf) => {
-                const oto = gltf.scene;
-                oto.name = 'オト';
-                oto.scale.setScalar(1.05);
-                oto.visible = false;
-                oto.userData.baseY = 0;
-                oto.jumpState = { active: false, startTime: 0 };
-                oto.traverse((node) => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                    }
-                });
-                characters[0] = oto;
-                scene.add(oto);
+            load3DCharacter(gltfLoader, OTO_MODEL_FILE, 0, 'オト');
+            load3DCharacter(gltfLoader, SYAORAN_MODEL_FILE, 1, 'シャオラン');
 
-                if (gltf.animations.length > 0) {
-                    const mixer = new THREE.AnimationMixer(oto);
-                    mixer.clipAction(gltf.animations[0]).play();
-                    characterMixers[0] = mixer;
-                }
-            });
-
-            for (let i = 1; i < MAX_HORSES; i++) {
+            for (let i = 2; i < MAX_HORSES; i++) {
                 const texture = textureLoader.load(characterImageFiles[i]);
                 texture.encoding = THREE.sRGBEncoding;
                 const material = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
@@ -250,6 +231,31 @@
                 characters[i] = characterPlane;
                 scene.add(characterPlane);
             }
+        }
+
+        function load3DCharacter(loader, modelFile, index, name) {
+            loader.load(modelFile, (gltf) => {
+                const character = gltf.scene;
+                character.name = name;
+                character.scale.setScalar(1.05);
+                character.visible = false;
+                character.userData.baseY = 0;
+                character.jumpState = { active: false, startTime: 0 };
+                character.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                characters[index] = character;
+                scene.add(character);
+
+                if (gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(character);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    characterMixers[index] = mixer;
+                }
+            });
         }
 
         function addTrackRail(x) {
