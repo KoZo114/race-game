@@ -6,6 +6,7 @@
     <title>推忍びダービー</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,6 +29,9 @@
         .horse-card > * { position: relative; }
         .horse-card:hover { border-color: #9c27b0; }
         .horse-card.selected { border-color: #6a1b9a; transform: scale(1.05); background: #f3e5f5; box-shadow: 0 4px 15px rgba(106, 27, 154, 0.3); }
+        .horse-card.oto-card { border-color: #ff9db0; background: linear-gradient(145deg, #fff4f7, #f4e8ff); }
+        .horse-card.oto-card::before { opacity: 0.42; }
+        .model-badge { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 999px; background: linear-gradient(135deg, #ff5d8f, #7c4dff); color: white; font-size: 0.72rem; font-weight: bold; box-shadow: 0 2px 8px rgba(124,77,255,.25); }
         .horse-emoji { font-size: 2rem; margin-bottom: 10px; }
         .horse-name { font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 5px; text-shadow: 0 0 5px white; }
         .horse-lane { font-size: 0.9rem; color: #666; text-shadow: 0 0 5px white; }
@@ -108,53 +112,195 @@
         let obstacles = [], obstacleMeshes = [], stumbleTimers = [];
         let gameState = 'setup', selectedHorse = null, winner = null, score = 0, raceCount = 0;
         let numHorses = 0, raceProgress = [], speeds = [];
-        let scene, camera, renderer, characters = [], animationId;
+        let scene, camera, renderer, characters = [], characterMixers = [], animationId;
         const allHorses = [
-            { id: 0, name: 'シャオラン' }, { id: 1, name: 'サクヤ' },
-            { id: 2, name: 'ネム' }, { id: 3, name: 'ヒナノジョウ' }
+            { id: 0, name: 'オト', emoji: '🦊', is3D: true }, { id: 1, name: 'サクヤ', emoji: '🏃‍♀️' },
+            { id: 2, name: 'ネム', emoji: '🏃‍♀️' }, { id: 3, name: 'ヒナノジョウ', emoji: '🏃‍♀️' }
         ];
         let currentHorses = [];
         const TRACK_LENGTH = 20, FINISH_LINE = 18, MAX_HORSES = 4;
+        const clock = new THREE.Clock();
         const characterImageFiles = ['syaoran1.webp', 'sakuya1.webp', 'remu1.webp', 'hinanojyou1.webp'];
+        const OTO_MODEL_FILE = 'assets/oto-running.glb';
 
         function init() {
             const canvas = document.getElementById('gameCanvas');
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87ceeb);
-            camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-            camera.position.set(0, 5, 12); camera.lookAt(0, 0, 0);
-            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+            scene.background = new THREE.Color(0x8fd3ff);
+            scene.fog = new THREE.Fog(0x8fd3ff, 18, 46);
+
+            camera = new THREE.PerspectiveCamera(58, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+            camera.position.set(0, 4.2, -15);
+            camera.lookAt(0, 1, -5);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(-5, 10, 5); directionalLight.castShadow = true; scene.add(directionalLight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.05;
+
+            scene.add(new THREE.HemisphereLight(0xcbeaff, 0x3f5d2e, 1.25));
+            const sun = new THREE.DirectionalLight(0xfff1d6, 1.45);
+            sun.position.set(-8, 14, -6);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(1024, 1024);
+            sun.shadow.camera.left = -12;
+            sun.shadow.camera.right = 12;
+            sun.shadow.camera.top = 14;
+            sun.shadow.camera.bottom = -14;
+            scene.add(sun);
+
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(42, 62),
+                new THREE.MeshStandardMaterial({ color: 0x4d8f45, roughness: 1 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.04;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
             const trackWidth = MAX_HORSES * 2;
-            const trackGeometry = new THREE.PlaneGeometry(trackWidth, TRACK_LENGTH);
-            const trackMaterial = new THREE.MeshLambertMaterial({ color: 0x6B8E23 });
-            const track = new THREE.Mesh(trackGeometry, trackMaterial);
-            track.rotation.x = -Math.PI / 2; track.receiveShadow = true; scene.add(track);
-            const startLine = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
-            startLine.position.set(0, 0.01, -TRACK_LENGTH/2 + 1); scene.add(startLine);
-            const finishLine = new THREE.Mesh(new THREE.BoxGeometry(trackWidth, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-            finishLine.position.set(0, 0.01, TRACK_LENGTH/2 - 1); scene.add(finishLine);
+            const track = new THREE.Mesh(
+                new THREE.PlaneGeometry(trackWidth, TRACK_LENGTH),
+                new THREE.MeshStandardMaterial({ color: 0xc8955f, roughness: 0.95 })
+            );
+            track.rotation.x = -Math.PI / 2;
+            track.receiveShadow = true;
+            scene.add(track);
+
+            for (let lane = 1; lane < MAX_HORSES; lane++) {
+                const x = -trackWidth / 2 + lane * 2;
+                for (let z = -TRACK_LENGTH / 2 + 0.6; z < TRACK_LENGTH / 2; z += 1.4) {
+                    const dash = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.035, 0.012, 0.72),
+                        new THREE.MeshBasicMaterial({ color: 0xfff4d8 })
+                    );
+                    dash.position.set(x, 0.012, z);
+                    scene.add(dash);
+                }
+            }
+
+            addTrackRail(-trackWidth / 2 - 0.45);
+            addTrackRail(trackWidth / 2 + 0.45);
+            addScenery();
+
+            const startLine = new THREE.Mesh(
+                new THREE.BoxGeometry(trackWidth, 0.025, 0.14),
+                new THREE.MeshBasicMaterial({ color: 0x35e06f })
+            );
+            startLine.position.set(0, 0.02, -TRACK_LENGTH / 2 + 1);
+            scene.add(startLine);
+
+            const finishLine = new THREE.Mesh(
+                new THREE.BoxGeometry(trackWidth, 0.025, 0.18),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
+            );
+            finishLine.position.set(0, 0.02, TRACK_LENGTH / 2 - 1);
+            scene.add(finishLine);
+            createFinishGate(trackWidth, TRACK_LENGTH / 2 - 1);
 
             const loadingManager = new THREE.LoadingManager();
             loadingManager.onLoad = () => {
                 document.getElementById('loadingOverlay').style.display = 'none';
                 document.getElementById('setupPhase').style.display = 'block';
             };
+            loadingManager.onError = (url) => {
+                console.error('読み込みに失敗しました:', url);
+                document.getElementById('loadingOverlay').textContent = '3Dデータの読み込みに失敗しました';
+            };
+
             const textureLoader = new THREE.TextureLoader(loadingManager);
-            for (let i = 0; i < MAX_HORSES; i++) {
+            const gltfLoader = new THREE.GLTFLoader(loadingManager);
+
+            gltfLoader.load(OTO_MODEL_FILE, (gltf) => {
+                const oto = gltf.scene;
+                oto.name = 'オト';
+                oto.scale.setScalar(1.05);
+                oto.visible = false;
+                oto.userData.baseY = 0;
+                oto.jumpState = { active: false, startTime: 0 };
+                oto.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                characters[0] = oto;
+                scene.add(oto);
+
+                if (gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(oto);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    characterMixers[0] = mixer;
+                }
+            });
+
+            for (let i = 1; i < MAX_HORSES; i++) {
                 const texture = textureLoader.load(characterImageFiles[i]);
-                const planeMaterial = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
-                const characterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), planeMaterial);
-                characterPlane.castShadow = true; characterPlane.visible = false;
+                texture.encoding = THREE.sRGBEncoding;
+                const material = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+                const characterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), material);
+                characterPlane.castShadow = true;
+                characterPlane.visible = false;
+                characterPlane.userData.baseY = 0.9;
                 characterPlane.jumpState = { active: false, startTime: 0 };
-                characters.push(characterPlane); scene.add(characterPlane);
+                characters[i] = characterPlane;
+                scene.add(characterPlane);
             }
         }
-        
+
+        function addTrackRail(x) {
+            const material = new THREE.MeshStandardMaterial({ color: 0xf7efe1, roughness: 0.72 });
+            const top = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, TRACK_LENGTH + 1.5), material);
+            top.position.set(x, 0.72, 0);
+            top.castShadow = true;
+            scene.add(top);
+            for (let z = -TRACK_LENGTH / 2; z <= TRACK_LENGTH / 2; z += 2.5) {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.82, 0.14), material);
+                post.position.set(x, 0.38, z);
+                post.castShadow = true;
+                scene.add(post);
+            }
+        }
+
+        function addScenery() {
+            const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x725038, roughness: 1 });
+            const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x2e783f, roughness: 0.9 });
+            for (let z = -10; z <= 12; z += 4) {
+                [-7, 7].forEach((x, side) => {
+                    const offsetZ = z + side * 1.3;
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.5, 8), trunkMaterial);
+                    trunk.position.set(x, 0.75, offsetZ);
+                    trunk.castShadow = true;
+                    scene.add(trunk);
+                    const crown = new THREE.Mesh(new THREE.ConeGeometry(1.15, 2.4, 10), leafMaterial);
+                    crown.position.set(x, 2.35, offsetZ);
+                    crown.castShadow = true;
+                    scene.add(crown);
+                });
+            }
+        }
+
+        function createFinishGate(trackWidth, z) {
+            const material = new THREE.MeshStandardMaterial({ color: 0x6a1b9a, roughness: 0.55 });
+            [-trackWidth / 2 - 0.2, trackWidth / 2 + 0.2].forEach((x) => {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.3, 0.25), material);
+                post.position.set(x, 1.65, z);
+                post.castShadow = true;
+                scene.add(post);
+            });
+            const banner = new THREE.Mesh(
+                new THREE.BoxGeometry(trackWidth + 0.7, 0.55, 0.18),
+                new THREE.MeshStandardMaterial({ color: 0xffd54f, emissive: 0x4d2500, emissiveIntensity: 0.2 })
+            );
+            banner.position.set(0, 3.05, z);
+            banner.castShadow = true;
+            scene.add(banner);
+        }
+
         function createSingleObstacle(lane, positionZ) {
             const lanePositionX = (lane - (numHorses - 1) / 2) * 2;
             for(const obs of obstacles) { if (Math.abs(obs.z - positionZ) < 2.0) return; }
@@ -172,9 +318,9 @@
             obstacleMesh.castShadow = true; scene.add(obstacleMesh); obstacleMeshes.push(obstacleMesh);
         }
         
-        function jumpCharacter(index) { 
+        function jumpCharacter(index) {
             const character = characters[index];
-            if (character.jumpState.active) return;
+            if (!character || character.jumpState.active) return;
             character.jumpState = { active: true, startTime: Date.now() };
         }
 
@@ -183,40 +329,62 @@
             selectionDiv.innerHTML = '';
             currentHorses.forEach((horse, index) => {
                 const card = document.createElement('div');
-                card.className = 'horse-card';
+                card.className = 'horse-card' + (horse.is3D ? ' oto-card' : '');
                 card.dataset.horse = index;
-                card.style.setProperty('--char-bg', `url('${characterImageFiles[index]}')`);
-                card.innerHTML = ` <div class="horse-emoji">🏃‍♀️</div> <div class="horse-name">${horse.name}</div> <div class="horse-lane">レーン ${index + 1}</div> `; 
-                card.addEventListener('click', () => { 
-                    document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected')); 
-                    card.classList.add('selected'); 
-                    selectedHorse = index; 
-                }); 
-                selectionDiv.appendChild(card); 
-            }); 
+                const background = horse.is3D
+                    ? 'radial-gradient(circle at 50% 38%, rgba(255,93,143,.58), rgba(124,77,255,.12) 46%, transparent 72%)'
+                    : "url('" + characterImageFiles[index] + "')";
+                card.style.setProperty('--char-bg', background);
+                card.innerHTML =
+                    (horse.is3D ? '<span class="model-badge">3D</span>' : '') +
+                    '<div class="horse-emoji">' + horse.emoji + '</div>' +
+                    '<div class="horse-name">' + horse.name + '</div>' +
+                    '<div class="horse-lane">レーン ' + (index + 1) + '</div>';
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedHorse = index;
+                });
+                selectionDiv.appendChild(card);
+            });
         }
 
         function animate() {
             animationId = requestAnimationFrame(animate);
             const now = Date.now();
+            const delta = Math.min(clock.getDelta(), 0.05);
+
+            characterMixers.forEach((mixer) => {
+                if (mixer && gameState === 'racing') mixer.update(delta * 1.35);
+            });
+
             characters.forEach((character, index) => {
+                if (!character) return;
+                const baseY = character.userData.baseY || 0;
                 if (character.jumpState.active) {
-                    const JUMP_DURATION = 600, JUMP_HEIGHT = 1.0, elapsedTime = now - character.jumpState.startTime;
-                    if (elapsedTime >= JUMP_DURATION) {
-                        character.position.y = 0.9; character.jumpState.active = false;
+                    const elapsedTime = now - character.jumpState.startTime;
+                    if (elapsedTime >= 600) {
+                        character.position.y = baseY;
+                        character.jumpState.active = false;
                     } else {
-                        const jumpProgress = elapsedTime / JUMP_DURATION;
-                        character.position.y = 0.9 + Math.sin(jumpProgress * Math.PI) * JUMP_HEIGHT;
+                        character.position.y = baseY + Math.sin((elapsedTime / 600) * Math.PI);
                     }
                 }
-                if (gameState === 'racing' && !character.jumpState.active) {
+                if (gameState === 'racing' && !character.jumpState.active && index !== 0) {
                     character.rotation.y = Math.sin(now * 0.01 + index * 2) * 0.1;
                 }
-                if (index < numHorses) {
+                if (gameState === 'racing' && index < numHorses) {
                     const targetZ = -TRACK_LENGTH / 2 + 1 + raceProgress[index];
                     character.position.z = THREE.MathUtils.lerp(character.position.z, targetZ, 0.1);
                 }
             });
+
+            if (gameState === 'racing' && raceProgress.length > 0) {
+                const leaderZ = -TRACK_LENGTH / 2 + 1 + Math.max(...raceProgress);
+                camera.position.z = THREE.MathUtils.lerp(camera.position.z, leaderZ - 7.5, 0.045);
+                camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.04);
+                camera.lookAt(0, 1.05, leaderZ + 3);
+            }
             renderer.render(scene, camera);
         }
 
@@ -279,9 +447,15 @@
             obstacles = []; obstacleMeshes = [];
             gameState = 'setup'; selectedHorse = null; winner = null;
             numHorses = 0; currentHorses = [];
-            characters.forEach(c => { 
-                c.visible = false; c.rotation.set(0,0,0); c.jumpState.active = false;
+            characters.forEach(c => {
+                if (!c) return;
+                c.visible = false;
+                c.rotation.set(0, 0, 0);
+                c.position.y = c.userData.baseY || 0;
+                c.jumpState.active = false;
             });
+            camera.position.set(0, 4.2, -15);
+            camera.lookAt(0, 1, -5);
             document.getElementById('resultPhase').style.display = 'none';
             document.getElementById('bettingPhase').style.display = 'none';
             document.getElementById('racingPhase').style.display = 'none';
@@ -289,9 +463,28 @@
         }
 
         function setupRace(count) { numHorses = count; currentHorses = allHorses.slice(0, numHorses); gameState = 'betting'; document.getElementById('setupPhase').style.display = 'none'; document.getElementById('bettingPhase').style.display = 'block'; generateHorseSelection(); resetCharacters(); }
-        function resetCharacters() { characters.forEach((character, index) => { if (index < numHorses) { character.visible = true; const lanePositionX = (index - (numHorses - 1) / 2) * 2; character.position.set(lanePositionX, 0.9, -TRACK_LENGTH / 2 + 1); } else { character.visible = false; } }); }
+        function resetCharacters() {
+            characters.forEach((character, index) => {
+                if (!character) return;
+                if (index < numHorses) {
+                    character.visible = true;
+                    const lanePositionX = (index - (numHorses - 1) / 2) * 2;
+                    const baseY = character.userData.baseY || 0;
+                    character.position.set(lanePositionX, baseY, -TRACK_LENGTH / 2 + 1);
+                } else {
+                    character.visible = false;
+                }
+            });
+        }
         function showResult() { document.getElementById('racingPhase').style.display = 'none'; document.getElementById('resultPhase').style.display = 'block'; document.getElementById('winnerName').textContent = currentHorses[winner].name; const resultMessage = document.getElementById('resultMessage'); const resultTitle = resultMessage.querySelector('.result-title'); const points = resultMessage.querySelector('.points'); if (selectedHorse === winner) { resultMessage.className = 'result-message success'; resultTitle.textContent = '🎉 予想的中！ 🎉'; points.textContent = '+10ポイント獲得！'; } else { resultMessage.className = 'result-message failure'; resultTitle.textContent = '😅 予想外れ...'; points.textContent = `あなたの予想: ${currentHorses[selectedHorse].name}`; } }
         function updateUI() { document.getElementById('score').textContent = score; document.getElementById('raceCount').textContent = raceCount; }
+        function onWindowResize() {
+            const canvas = document.getElementById('gameCanvas');
+            camera.aspect = canvas.clientWidth / canvas.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+        }
+
         window.addEventListener('load', () => { init(); animate(); window.addEventListener('resize', onWindowResize); });
     </script>
 </body>
