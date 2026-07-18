@@ -115,7 +115,7 @@
         let scene, camera, renderer, characters = [], characterMixers = [], animationId;
         const allHorses = [
             { id: 0, name: 'オト', emoji: '🦊', is3D: true }, { id: 1, name: 'シャオラン', emoji: '☀️', is3D: true },
-            { id: 2, name: 'ネム', emoji: '🏃‍♀️' }, { id: 3, name: 'ウカ', emoji: '⛩️', is3D: true }
+            { id: 2, name: 'ネム', emoji: '🌈', is3D: true }, { id: 3, name: 'ウカ', emoji: '⛩️', is3D: true }
         ];
         let currentHorses = [];
         const TRACK_LENGTH = 20, FINISH_LINE = 18, MAX_HORSES = 4;
@@ -124,6 +124,7 @@
         const OTO_MODEL_FILE = 'assets/oto-running.glb';
         const SYAORAN_MODEL_FILE = 'assets/syaoran-running.glb';
         const UKA_MODEL_FILE = 'assets/uka-running.glb';
+        const NEMU_MODEL_FILE = 'assets/nemu-running.glb';
 
         function init() {
             const canvas = document.getElementById('gameCanvas');
@@ -219,22 +220,8 @@
 
             load3DCharacter(gltfLoader, OTO_MODEL_FILE, 0, 'オト');
             load3DCharacter(gltfLoader, SYAORAN_MODEL_FILE, 1, 'シャオラン');
+            load3DCharacter(gltfLoader, NEMU_MODEL_FILE, 2, 'ネム');
             load3DCharacter(gltfLoader, UKA_MODEL_FILE, 3, 'ウカ');
-
-            load2DCharacter(textureLoader, 2);
-        }
-
-        function load2DCharacter(textureLoader, index) {
-            const texture = textureLoader.load(characterImageFiles[index]);
-            texture.encoding = THREE.sRGBEncoding;
-            const material = new THREE.MeshLambertMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
-            const characterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), material);
-            characterPlane.castShadow = true;
-            characterPlane.visible = false;
-            characterPlane.userData.baseY = 0.9;
-            characterPlane.jumpState = { active: false, startTime: 0 };
-            characters[index] = characterPlane;
-            scene.add(characterPlane);
         }
 
         function load3DCharacter(loader, modelFile, index, name) {
