@@ -32,6 +32,9 @@
         .horse-card.oto-card { border-color: #ff9db0; background: linear-gradient(145deg, #fff4f7, #f4e8ff); }
         .horse-card.oto-card::before { opacity: 0.42; }
         .model-badge { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 999px; background: linear-gradient(135deg, #ff5d8f, #7c4dff); color: white; font-size: 0.72rem; font-weight: bold; box-shadow: 0 2px 8px rgba(124,77,255,.25); }
+        .character-preview { height: 150px; margin: -8px auto 8px; display: flex; align-items: center; justify-content: center; }
+        .character-preview img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 10px 8px rgba(65, 38, 92, 0.24)); }
+        .character-preview .preview-fallback { font-size: 4rem; }
         .horse-emoji { font-size: 2rem; margin-bottom: 10px; }
         .horse-name { font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 5px; text-shadow: 0 0 5px white; }
         .horse-lane { font-size: 0.9rem; color: #666; text-shadow: 0 0 5px white; }
@@ -112,7 +115,7 @@
         let obstacles = [], obstacleMeshes = [], stumbleTimers = [];
         let gameState = 'setup', selectedHorse = null, winner = null, score = 0, raceCount = 0;
         let numHorses = 0, raceProgress = [], speeds = [];
-        let scene, camera, renderer, characters = [], characterMixers = [], animationId;
+        let scene, camera, renderer, characters = [], characterMixers = [], characterThumbnails = [], animationId;
         const allHorses = [
             { id: 0, name: 'オト', emoji: '🦊', is3D: true }, { id: 1, name: 'シャオラン', emoji: '☀️', is3D: true },
             { id: 2, name: 'ネム', emoji: '🌈', is3D: true }, { id: 3, name: 'ウカ', emoji: '⛩️', is3D: true }
@@ -207,6 +210,7 @@
 
             const loadingManager = new THREE.LoadingManager();
             loadingManager.onLoad = () => {
+                createCharacterThumbnails();
                 document.getElementById('loadingOverlay').style.display = 'none';
                 document.getElementById('setupPhase').style.display = 'block';
             };
@@ -321,6 +325,59 @@
             character.jumpState = { active: true, startTime: Date.now() };
         }
 
+        function createCharacterThumbnails() {
+            const previewRenderer = new THREE.WebGLRenderer({
+                alpha: true,
+                antialias: true,
+                preserveDrawingBuffer: true,
+                powerPreference: 'low-power'
+            });
+            previewRenderer.setPixelRatio(1);
+            previewRenderer.setSize(320, 220, false);
+            previewRenderer.setClearColor(0x000000, 0);
+            previewRenderer.outputEncoding = THREE.sRGBEncoding;
+            previewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+            previewRenderer.toneMappingExposure = 1.1;
+
+            const previewScene = new THREE.Scene();
+            previewScene.add(new THREE.HemisphereLight(0xffffff, 0x73506e, 1.65));
+            const previewLight = new THREE.DirectionalLight(0xfff2df, 1.8);
+            previewLight.position.set(2.5, 4, 3.5);
+            previewScene.add(previewLight);
+
+            const previewCamera = new THREE.PerspectiveCamera(34, 320 / 220, 0.1, 20);
+            previewCamera.position.set(0, 0.92, 3.45);
+            previewCamera.lookAt(0, 0.9, 0);
+
+            characters.forEach((character, index) => {
+                if (!character) return;
+                const parent = character.parent;
+                const savedPosition = character.position.clone();
+                const savedRotation = character.rotation.clone();
+                const savedScale = character.scale.clone();
+                const savedVisible = character.visible;
+
+                if (characterMixers[index]) characterMixers[index].setTime(0.22);
+                previewScene.add(character);
+                character.position.set(0, 0, 0);
+                character.rotation.set(0, 0, 0);
+                character.scale.setScalar(1.05);
+                character.visible = true;
+
+                previewRenderer.render(previewScene, previewCamera);
+                characterThumbnails[index] = previewRenderer.domElement.toDataURL('image/webp', 0.88);
+
+                if (parent) parent.add(character);
+                character.position.copy(savedPosition);
+                character.rotation.copy(savedRotation);
+                character.scale.copy(savedScale);
+                character.visible = savedVisible;
+            });
+
+            previewRenderer.dispose();
+            if (previewRenderer.forceContextLoss) previewRenderer.forceContextLoss();
+        }
+
         function generateHorseSelection() {
             const selectionDiv = document.getElementById('horseSelection');
             selectionDiv.innerHTML = '';
@@ -328,15 +385,21 @@
                 const card = document.createElement('div');
                 card.className = 'horse-card' + (horse.is3D ? ' oto-card' : '');
                 card.dataset.horse = index;
-                const background = horse.is3D
-                    ? 'radial-gradient(circle at 50% 38%, rgba(255,93,143,.58), rgba(124,77,255,.12) 46%, transparent 72%)'
-                    : "url('" + characterImageFiles[index] + "')";
-                card.style.setProperty('--char-bg', background);
+                card.style.setProperty(
+                    '--char-bg',
+                    'radial-gradient(circle at 50% 38%, rgba(255,93,143,.5), rgba(124,77,255,.12) 46%, transparent 72%)'
+                );
+
+                const preview = characterThumbnails[index]
+                    ? '<img src="' + characterThumbnails[index] + '" alt="' + horse.name + 'の3Dキャラクター">'
+                    : '<span class="preview-fallback">' + horse.emoji + '</span>';
+
                 card.innerHTML =
-                    (horse.is3D ? '<span class="model-badge">3D</span>' : '') +
-                    '<div class="horse-emoji">' + horse.emoji + '</div>' +
+                    '<span class="model-badge">3D</span>' +
+                    '<div class="character-preview">' + preview + '</div>' +
                     '<div class="horse-name">' + horse.name + '</div>' +
                     '<div class="horse-lane">レーン ' + (index + 1) + '</div>';
+
                 card.addEventListener('click', () => {
                     document.querySelectorAll('.horse-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
